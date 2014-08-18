@@ -47,8 +47,14 @@ if (anyDuplicated(xcolnames[xcolnames != 'NULL'])) stop ('duplicate column names
 
 
 # we must explicitly set sep='' to ensure that multiple delimiters are counted as just one!
+xcolclasses <- xcolnames
+xcolclasses[xcolclasses != 'NULL'] = 'numeric'
 xtrain <- read.csv('UCI HAR Dataset/train/X_train.txt', header=FALSE, sep='', colClasses = xcolclasses)
 colnames(xtrain)  <- feat$description
+
+# read the subjects for training and bind to the data set
+strain <- read.csv('UCI HAR Dataset//train/subject_train.txt', header=FALSE, colClasses='integer', col.names='subject.id')
+xtrain <- cbind(strain, xtrain)
 
 # read in the activities reference table
 activities <- read.csv('UCI HAR Dataset/activity_labels.txt', 

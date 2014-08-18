@@ -77,10 +77,19 @@ activities <- read.csv('UCI HAR Dataset/activity_labels.txt',
               col.names=c('activity.id','activity.desc'),
               colClasses=c('integer','character'))
 
-# read in the ytrain data and merge with activities to get descriptive labels
+# read in the training data and merge with activities to get descriptive labels
+# (we set SORT=FALSE so that the merge does not misalign the data)
 ytrain <- read.csv('UCI HAR Dataset/train/y_train.txt', colClasses='integer', col.names='activity.id', header=FALSE)
 ytrain <-  merge(ytrain, activities, by.x='activity.id', by.y='activity.id', sort=FALSE)
+xtrain <- cbind(ytrain, xtrain)
 
+# read in the testing data and merge with activities to get descriptive labels
+# (we set SORT=FALSE so that the merge does not misalign the data)
 ytest <- read.csv('UCI HAR Dataset/test/y_test.txt', colClasses='integer', col.names='activity.id', header=FALSE)
 ytest <-  merge(ytest, activities, by.x='activity.id', by.y='activity.id', sort=FALSE)
+xtest <- cbind(ytest, xtest)
+
+# merge testing and training
+tidyOne <- rbind(xtrain, xtest)
+
 

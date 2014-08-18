@@ -46,13 +46,14 @@ for (i in feat$colnum) xcolnames[i] <- feat[feat$colnum==i,'description']
 xtrain <- read.csv('UCI HAR Dataset/train/X_train.txt', header=FALSE, sep='', colClasses = xcolclasses)
 colnames(xtrain)  <- feat$description
 
-ytrain <- read.csv('UCI HAR Dataset/train/y_train.txt', colClasses='integer', col.names='activity.id')
-
-
 # read in the activities reference table
 activities <- read.csv('UCI HAR Dataset/activity_labels.txt', 
               header=FALSE, sep=' ', 
-              col.names=c('id','description'),
+              col.names=c('activity.id','activity.desc'),
               colClasses=c('integer','character'))
+
+# read in the ytrain data and merge with activities to get descriptive labels
+ytrain <- read.csv('UCI HAR Dataset/train/y_train.txt', colClasses='integer', col.names='activity.id', header=FALSE)
+ytrain <-  merge(ytrain, activities, by.x='activity.id', by.y='activity.id', sort=FALSE)
 
 

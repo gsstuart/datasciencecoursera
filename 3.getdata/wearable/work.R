@@ -13,6 +13,9 @@ feat <- read.csv('UCI HAR Dataset/features.txt',
 # 2      2 tBodyAcc-mean()-Y
 # 3      3 tBodyAcc-mean()-Z
 
+# initialize a vector of column names that will be used later to read the columns we want from train & test data.
+xcolnames <- rep('NULL', nrow(feat))
+
 # since we are only interested in measurements of mean and standard deviation,
 # let's identify those columns.  the project instructions allow for interpretations
 # on exactly what columns to include, so we will go with all columns containing "mean" 
@@ -35,10 +38,13 @@ feat$description <- sub('[^a-z0-9]+$', '', feat$description, ignore.case=TRUE)
 # 2      2 tBodyAcc.mean.Y
 # 3      3 tBodyAcc.mean.Z
 
+# populate the NULL-initialized vector of column names with the columns we've chosen...
+# since by default columns are NULL, they will be skipped over when we pass this to read.csv
+for (i in feat$colnum) xcolnames[i] <- feat[feat$colnum==i,'description']
 
 # we must explicitly set sep='' to ensure that multiple delimiters are counted as just one!
-xtrain <- read.csv('UCI HAR Dataset/train/X_train.txt', header=FALSE, sep='')
-
+xtrain <- read.csv('UCI HAR Dataset/train/X_train.txt', header=FALSE, sep='', colClasses = xcolclasses)
+colnames(xtrain)  <- feat$description
 
 
 

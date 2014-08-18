@@ -46,15 +46,30 @@ for (i in feat$colnum) xcolnames[i] <- feat[feat$colnum==i,'description']
 if (anyDuplicated(xcolnames[xcolnames != 'NULL'])) stop ('duplicate column names detected.  this should not happen!')
 
 
-# we must explicitly set sep='' to ensure that multiple delimiters are counted as just one!
 xcolclasses <- xcolnames
 xcolclasses[xcolclasses != 'NULL'] = 'numeric'
+
+### READ TRAINING DATA
+# we must explicitly set sep='' to ensure that multiple delimiters are counted as just one!
 xtrain <- read.csv('UCI HAR Dataset/train/X_train.txt', header=FALSE, sep='', colClasses = xcolclasses)
 colnames(xtrain)  <- feat$description
 
 # read the subjects for training and bind to the data set
 strain <- read.csv('UCI HAR Dataset//train/subject_train.txt', header=FALSE, colClasses='integer', col.names='subject.id')
 xtrain <- cbind(strain, xtrain)
+### END READ TRAINING DATA
+
+### READ TEST DATA
+# we must explicitly set sep='' to ensure that multiple delimiters are counted as just one!
+xtest <- read.csv('UCI HAR Dataset/test/X_test.txt', header=FALSE, sep='', colClasses = xcolclasses)
+colnames(xtest)  <- feat$description
+
+# read the subjects for testing and bind to the data set
+stest <- read.csv('UCI HAR Dataset/test/subject_test.txt', header=FALSE, colClasses='integer', col.names='subject.id')
+xtest <- cbind(stest, xtest)
+### END READ TEST DATA
+
+
 
 # read in the activities reference table
 activities <- read.csv('UCI HAR Dataset/activity_labels.txt', 
@@ -66,4 +81,6 @@ activities <- read.csv('UCI HAR Dataset/activity_labels.txt',
 ytrain <- read.csv('UCI HAR Dataset/train/y_train.txt', colClasses='integer', col.names='activity.id', header=FALSE)
 ytrain <-  merge(ytrain, activities, by.x='activity.id', by.y='activity.id', sort=FALSE)
 
+ytest <- read.csv('UCI HAR Dataset/test/y_test.txt', colClasses='integer', col.names='activity.id', header=FALSE)
+ytest <-  merge(ytest, activities, by.x='activity.id', by.y='activity.id', sort=FALSE)
 

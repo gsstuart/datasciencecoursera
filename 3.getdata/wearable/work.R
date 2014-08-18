@@ -42,6 +42,10 @@ feat$description <- sub('[^a-z0-9]+$', '', feat$description, ignore.case=TRUE)
 # since by default columns are NULL, they will be skipped over when we pass this to read.csv
 for (i in feat$colnum) xcolnames[i] <- feat[feat$colnum==i,'description']
 
+# do a final sanity check to ensure we have all unique colnames
+if (anyDuplicated(xcolnames[xcolnames != 'NULL'])) stop ('duplicate column names detected.  this should not happen!')
+
+
 # we must explicitly set sep='' to ensure that multiple delimiters are counted as just one!
 xtrain <- read.csv('UCI HAR Dataset/train/X_train.txt', header=FALSE, sep='', colClasses = xcolclasses)
 colnames(xtrain)  <- feat$description

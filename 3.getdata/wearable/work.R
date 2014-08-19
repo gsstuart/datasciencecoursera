@@ -1,5 +1,9 @@
 # TO RUN THIS CODE: comment or change the below setwd() call as needed
+# the data files are expected to be in a  directory named 'UCI HAR Dataset',
+# as in the ZIP file.  This R file is expected to be one level up from that.
 setwd('/home/scott/datasciencecoursera/3.getdata/wearable/')
+
+library(plyr)  # plyr is used for the final step (creation of 2nd tidy set)
 
 # read in features.txt, so we can easily manipulate which columns to subset
 feat <- read.csv('UCI HAR Dataset/features.txt', 
@@ -92,4 +96,8 @@ xtest <- cbind(ytest, xtest)
 # merge testing and training
 tidyOne <- rbind(xtrain, xtest)
 
+# group by activity and subject and compute averages
+tidyTwo <- ddply(tidyOne, c('activity.id', 'activity.desc', 'subject.id'), function(x) colMeans(x[,-(1:3)]))
+# append '.tidyMean' to each column name to indicate this is the mean as specified for the 2nd tidy set
+colnames(tidyTwo)[-(1:3)] <- paste0(colnames(tidyTwo)[-(1:3)],".tidyMean")
 

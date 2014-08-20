@@ -88,13 +88,14 @@ xtrain <- cbind(ytrain, xtrain)
 # read in the testing data and merge with activities to get descriptive labels
 # (we set SORT=FALSE so that the merge does not misalign the data)
 ytest <- read.csv('test/y_test.txt', colClasses='integer', col.names='activity.id', header=FALSE)
-ytest <-  merge(ytest, activities, by.x='activity.id', by.y='activity.id', sort=FALSE)
+ytest <- merge(ytest, activities, by.x='activity.id', by.y='activity.id', sort=FALSE)
 xtest <- cbind(ytest, xtest)
 
 # merge testing and training
 tidyOne <- rbind(xtrain, xtest)
 
 # group by (activity and subject) and compute averages
+# let's leave both activity ID and description in for good measure
 tidyTwo <- ddply(tidyOne, c('activity.id', 'activity.desc', 'subject.id'), function(x) colMeans(x[,-(1:3)]))
 # append '.tidyMean' to each column name to indicate this is the mean as specified for the 2nd tidy set
 colnames(tidyTwo)[-(1:3)] <- paste0(colnames(tidyTwo)[-(1:3)],".tidyMean")

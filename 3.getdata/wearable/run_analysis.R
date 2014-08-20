@@ -102,3 +102,8 @@ colnames(tidyTwo)[-(1:3)] <- paste0(colnames(tidyTwo)[-(1:3)],".tidyMean")
 
 # the variable tidyTwo now contains our final and desired result.
 
+# to write a tidyTwo output file, as specified in Step 5 of the project instructions,
+# uncomment the following line, modifying the path if desired:
+# write.table(tidyTwo, 'tidyTwo.txt', row.name=FALSE)
+
+

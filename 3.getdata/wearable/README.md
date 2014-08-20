@@ -1,5 +1,3 @@
-README.md
-
 This project utilizes data from the University of California, Irvine, as explained in the companion file `CodeBook.md`.
 
 The script `run_analysis.R` will load the data from UCI's data set and perform the following operations:

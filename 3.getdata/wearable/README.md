@@ -1,4 +1,4 @@
-README.md i
+README.md
 
 This project utilizes data from the University of California, Irvine, as explained in the companion file `CodeBook.md`.
 

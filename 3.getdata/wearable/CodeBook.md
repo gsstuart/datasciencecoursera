@@ -10,6 +10,8 @@ This code book and the data set it represents have been adapted from the "Human 
 http://archive.ics.uci.edu/ml/datasets/Human+Activity+Recognition+Using+Smartphones
 http://archive.ics.uci.edu/ml/machine-learning-databases/00240/UCI%20HAR%20Dataset.zip
 
+[NOTE: Students have begun to report 403/Forbidden errors at the above links.  This is outside the control of the author.  Please see Coursera forums for the latest information on this issue.]
+
 The column names in this data set are modified versions of the original names, with non-alphanumeric characters replaced with a single dot, and ".tidyMean" appended to indicate that these are aggregate values as specified by the Course Project.  Those unfamiliar with the original study are urged to review `features_info.txt` and other documents in the above-referenced ZIP file, as everything in this data set is derivative of UCI's original.
 
 The first three columns indicate the activity and subject, and the remaining columns are the aggregated averages, all of which are variable-length real numbers.  Fields prefixed with a "t" are time series data captured at 50Hz.  Fields prefixed with an "f" are frequency domain signals.

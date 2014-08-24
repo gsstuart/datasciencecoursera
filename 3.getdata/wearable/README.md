@@ -1,4 +1,4 @@
-<img src='http://www.snowcrest.net/siskiyoulibrary/images/stories/readme.jpg' style='height:150px; display:block; margin-left:auto; margin-right:auto'>
+<img src='https://c336017.ssl.cf1.rackcdn.com/icon-readmestorieschildrensbooks.png' style='display:block; margin-left:auto; margin-right:auto'>
 
 <br>
 

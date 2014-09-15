@@ -23,7 +23,7 @@ totalPM = tapply(baltimore$Emissions, baltimore$year, sum)
 # generate the plot
 options(scipen=7) # avoid scientific notation
 plot(names(totalPM), totalPM, xlab='Year', main='Total PM2.5 Emissions, Baltimore City', type='o', 
-     lwd=5, family='HersheyGothicGerman', col='sienna1', pch=3)
+     lwd=5, family='URWGothic', col='sienna1', pch=3)
 
 # clean-up PNG if necessary
 if (writePNG) dev.off()

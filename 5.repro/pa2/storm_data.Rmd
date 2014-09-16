@@ -1,0 +1,309 @@
+```{r}
+set.seed(27182818)
+library(plyr, quietly=TRUE)
+library(dplyr, quietly=TRUE)
+library(ggplot2, quietly=TRUE)
+library(gridExtra, quietly=TRUE)
+```
+
+<!-- setwd("~/datasciencecoursera//5.repro//pa2") -->
+
+## Data Processing
+
+The original NOAA/NWS input file is read into data frame `storm`, which will serve as the primary source for the analysis.  To minimize the footprint of this large dataset, columns not used in the analysis are dropped.  Investigators reproducing this analysis should have this script and the `repdata_data_StormData.csv.bz2` input file in the current working directory.
+
+After each stage of processing a sample of the data will be presented.
+
+```{r loadData, cache=TRUE}
+colClasses = c("numeric","character","NULL","NULL","NULL","NULL","character","character","NULL","NULL","NULL","NULL","NULL","NULL","NULL","NULL","NULL","NULL","NULL","NULL","character","numeric","numeric","numeric","numeric","character","numeric","character","character","NULL","NULL","NULL","NULL","NULL","NULL","NULL","NULL")
+storm <- read.csv('repdata_data_StormData.csv.bz2', colClasses=colClasses)
+glimpse(storm)
+```
+
+Column `pdate` is added to provide the event date in a POSIX-compliant format, and the range of dates covered in the input file is calculated for inclusion in plots.
+
+```{r}
+storm$pdate <- as.Date(storm$BGN_DATE, "%m/%d/%Y")
+pdate_range <- format(range(storm$pdate), '%b %Y')
+pdate_range_str <- paste0(pdate_range[[1]], " - ", pdate_range[[2]])
+sample_n(select(storm, EVTYPE, BGN_DATE, pdate), 10)
+```
+
+Columns `prop_dmg_tot` and `crop_dmg_tot` are added to provide the numeric dollar amount of property and crop damage, respectively.  The input file represents this as a base number and a multiplier.  As per section 2.7 of the NWS codebook, this multiplier can take a value of "K" for thousands, "M" for millions, and "B" for billions.  In this transformation the corresponding multiplication is performed, matching case-insensitively on these multiplier values and ignoring any others.  Multipliers outside the documented range do exist sparsely in the data.
+
+```{r}
+storm$prop_dmg_tot <- storm$PROPDMG * ifelse(storm$PROPDMGEXP %in% c('k','K'), 1e+03,
+                                      ifelse(storm$PROPDMGEXP %in% c('m','M'), 1e+06,
+                                      ifelse(storm$PROPDMGEXP %in% c('b','B'), 1e+09, 0)))
+
+storm$crop_dmg_tot <- storm$CROPDMG * ifelse(storm$CROPDMGEXP %in% c('k','K'), 1e+03,
+                                      ifelse(storm$CROPDMGEXP %in% c('m','M'), 1e+06,
+                                      ifelse(storm$CROPDMGEXP %in% c('b','B'), 1e+09, 0)))
+sample_n(select(filter(storm, prop_dmg_tot > 0), EVTYPE, PROPDMG, PROPDMGEXP, prop_dmg_tot), 10)
+```
+
+The `EVTYPE` column in the original data specifies the type of storm, based on the storm designations in the NWS codebook.  This data field is highly unstructured, with many different labels used to described the same phenomenon; this is due to differing naming conventions, abbreviations, and misspellings introduced by the wide variety of researchers contributing to this data set.
+
+An example of the ambiguity of `EVTYPE`:
+
+```{r}
+unique(storm[grepl("LIGHT SNOW", storm$EVTYPE, ignore.case = TRUE), 'EVTYPE'])
+```
+
+As this analysis will perform aggregations based on event type, `EVTYPE` will be standardized to eliminate much of this ambiguity.  Since this analysis is only concerned with storm events that have caused injury to people or property, this standardization will be limited to only those events.
+
+```{r}
+unique(storm[storm$FATALITIES + storm$INJURIES + storm$PROPDMG + storm$CROPDMG > 0, 'EVTYPE'])
+```
+*Table x.*  The list of unique storm event types that have caused injury, death, property damage, or crop damage.
+
+A new list `storm_evmap` is created, which will create a higher-level designation into which each storm event listed above will be classed.  For example, both "LIGHT SNOW" and "Light Snowfall" will be mapped to a new category "SNOW".  The mappings are based on a review of the NWS codebook, as well as common-sense examination of the various `EVTYPE` values.  Investigators wishing to explore alternate classifications can easily modify this mapping and re-execute to see the results based on new mappings.  The author also suggests that investigators expanding on this work move this mapping to a seperate CSV file.  To ensure compliance with the specifications for this analysis, however, the mapping will be performed completely in-line; the author regrets any inconvenience over the lack of brevity in the surrounding sections of code.
+
+```{r}
+storm_evmap <- list(
+ AVALANCHE = c("AVALANCE", "AVALANCHE"),
+ `BEACH EROSION` = "Beach Erosion", 
+ `BLACK ICE` = "BLACK ICE",
+ `COASTAL STORM` = c("Coastal Storm", 
+    "COASTAL STORM", "COASTAL SURGE", "COASTALSTORM"),
+ COLD = c("Cold", 
+    "COLD", "COLD AND SNOW", "COLD AND WET CONDITIONS", "Cold Temperature", 
+    "COLD WAVE", "COLD WEATHER", "COLD/WIND CHILL", "COLD/WINDS", 
+    "COOL AND WET", "Damaging Freeze", "DAMAGING FREEZE", "Early Frost", 
+    "Extended Cold", "Extreme Cold", "EXTREME COLD", "EXTREME COLD/WIND CHILL", 
+    "EXTREME WIND CHILL", "EXTREME WINDCHILL", "Glaze", "GLAZE", 
+    "GLAZE ICE", "GLAZE/ICE STORM", "HARD FREEZE", "HYPERTHERMIA/EXPOSURE", 
+    "HYPOTHERMIA", "Hypothermia/Exposure", "HYPOTHERMIA/EXPOSURE", 
+    "LOW TEMPERATURE", "RECORD COLD", "SLEET", "SLEET/ICE STORM", 
+    "Unseasonable Cold", "UNSEASONABLY COLD"),
+ `DAM BREAK` = "DAM BREAK", 
+ DROUGHT = c("DROUGHT", "DROUGHT/EXCESSIVE HEAT"),
+ DROWNING = "DROWNING", 
+ DUST = c("BLOWING DUST", "Dust Devil", "DUST DEVIL", "DUST DEVIL WATERSPOUT", 
+    "DUST STORM", "DUST STORM/HIGH WINDS"),
+ FIRE = c("BRUSH FIRE", 
+    "FOREST FIRES", "GRASS FIRES", "WILD FIRES", "WILD/FOREST FIRE", 
+    "WILD/FOREST FIRES", "WILDFIRE", "WILDFIRES"),
+ `FLASH FLOOD` = c(" FLASH FLOOD", 
+    "FLASH FLOOD", "FLASH FLOOD - HEAVY RAIN", "FLASH FLOOD FROM ICE JAMS", 
+    "FLASH FLOOD LANDSLIDES", "FLASH FLOOD WINDS", "FLASH FLOOD/", 
+    "FLASH FLOOD/ STREET", "FLASH FLOOD/FLOOD", "FLASH FLOOD/LANDSLIDE", 
+    "FLASH FLOODING", "FLASH FLOODING/FLOOD", "FLASH FLOODING/THUNDERSTORM WI", 
+    "FLASH FLOODS"),
+ FLOOD = c("BREAKUP FLOODING", "COASTAL  FLOODING/EROSION", 
+    "COASTAL EROSION", "Coastal Flood", "COASTAL FLOOD", "Coastal Flooding", 
+    "COASTAL FLOODING", "COASTAL FLOODING/EROSION", "Erosion/Cstl Flood", 
+    "FLOOD", "FLOOD & HEAVY RAIN", "FLOOD FLASH", "FLOOD/FLASH", 
+    "FLOOD/FLASH FLOOD", "FLOOD/FLASH/FLOOD", "FLOOD/FLASHFLOOD", 
+    "FLOOD/RAIN/WINDS", "FLOOD/RIVER FLOOD", "FLOODING", "FLOODING/HEAVY RAIN", 
+    "FLOODS", "HEAVY RAIN AND FLOOD", "HEAVY RAINS/FLOODING", 
+    "HEAVY SURF COASTAL FLOODING", "LAKE FLOOD", "LAKESHORE FLOOD", 
+    "MAJOR FLOOD", "MINOR FLOODING", "RAPIDLY RISING WATER", 
+    "RIVER AND STREAM FLOOD", "RIVER FLOOD", "River Flooding", 
+    "RIVER FLOODING", "RURAL FLOOD", "SMALL STREAM FLOOD", "SNOWMELT FLOODING", 
+    "STORM SURGE", "STORM SURGE/TIDE", "Tidal Flooding", "TIDAL FLOODING", 
+    "URBAN AND SMALL", "URBAN AND SMALL STREAM FLOODIN", "URBAN FLOOD", 
+    "URBAN FLOODING", "URBAN FLOODS", "URBAN SMALL", "URBAN/SMALL STREAM", 
+    "URBAN/SMALL STREAM FLOOD", "URBAN/SML STREAM FLD"),
+ FOG = c("DENSE FOG", 
+    "FOG", "FOG AND COLD TEMPERATURES"),
+ FREEZE = c("AGRICULTURAL FREEZE", 
+    "Freeze", "FREEZE", "Freezing drizzle", "Freezing Drizzle", 
+    "FREEZING DRIZZLE", "FREEZING FOG", "Freezing Rain", "FREEZING RAIN", 
+    "FREEZING RAIN/SLEET", "FREEZING RAIN/SNOW", "Freezing Spray", 
+    "FROST", "Frost/Freeze", "FROST/FREEZE", "FROST\\FREEZE"), 
+    `FUNNEL CLOUD` = "FUNNEL CLOUD", 
+ HAIL = c("HAIL", "HAIL 0.75", 
+    "HAIL 075", "HAIL 100", "HAIL 125", "HAIL 150", "HAIL 175", 
+    "HAIL 200", "HAIL 275", "HAIL 450", "HAIL 75", "HAIL DAMAGE", 
+    "HAIL/WIND", "HAIL/WINDS", "HAILSTORM", "SMALL HAIL"),
+ HEAT = c("EXCESSIVE HEAT", 
+    "EXTREME HEAT", "HEAT", "Heat Wave", "HEAT WAVE", "HEAT WAVE DROUGHT", 
+    "HEAT WAVES", "RECORD HEAT", "RECORD/EXCESSIVE HEAT", "UNSEASONABLY WARM", 
+    "UNSEASONABLY WARM AND DRY", "WARM WEATHER"),
+ `HIGH TIDE` = "ASTRONOMICAL HIGH TIDE", 
+  HURRICANE = c("HURRICANE", "Hurricane Edouard", "HURRICANE EMILY", 
+    "HURRICANE ERIN", "HURRICANE FELIX", "HURRICANE GORDON", 
+    "HURRICANE OPAL", "HURRICANE OPAL/HIGH WINDS", "HURRICANE-GENERATED SWELLS", 
+    "HURRICANE/TYPHOON", "TROPICAL DEPRESSION", "TROPICAL STORM", 
+    "TROPICAL STORM ALBERTO", "TROPICAL STORM DEAN", "TROPICAL STORM GORDON", 
+    "TROPICAL STORM JERRY"),
+ ICE = c("ICE", "ICE AND SNOW", "ICE FLOES", 
+    "ICE JAM", "Ice jam flood (minor", "ICE JAM FLOODING", "ICE ON ROAD", 
+    "ICE ROADS", "ICE STORM", "ICE STORM/FLASH FLOOD", "ICE/STRONG WINDS", 
+    "ICY ROADS"),
+ LANDSLIDE = c("LANDSLIDE", "LANDSLIDES", "Landslump", 
+    "ROCK SLIDE"),
+ LIGHTNING = c("LIGHTING", "LIGHTNING", "LIGHTNING  WAUSEON", 
+    "LIGHTNING AND HEAVY RAIN", "LIGHTNING AND THUNDERSTORM WIN", 
+    "LIGHTNING FIRE", "LIGHTNING INJURY", "LIGHTNING THUNDERSTORM WINDS", 
+    "LIGHTNING.", "LIGHTNING/HEAVY RAIN", "LIGNTNING"),
+ `LOW TIDE` = "ASTRONOMICAL LOW TIDE", 
+    MARINE = c("Marine Accident", "MARINE HAIL", "MARINE HIGH WIND", 
+    "MARINE MISHAP", "MARINE STRONG WIND", "MARINE THUNDERSTORM WIND", 
+    "MARINE TSTM WIND"),
+ MUDSLIDE = c("MUD SLIDE", "MUD SLIDES", 
+    "MUD SLIDES URBAN FLOODING", "Mudslide", "MUDSLIDE", "Mudslides", 
+    "MUDSLIDES"),
+ OTHER = c("?", "APACHE COUNTY", "HIGH", "Other", 
+    "OTHER"),
+ RAIN = c("EXCESSIVE RAINFALL", "EXCESSIVE WETNESS", 
+    "HEAVY PRECIPITATION", "HEAVY RAIN", "Heavy Rain/High Surf", 
+    "HEAVY RAIN/LIGHTNING", "HEAVY RAIN/SEVERE WEATHER", "HEAVY RAIN/SMALL STREAM URBAN", 
+    "HEAVY RAIN/SNOW", "HEAVY RAINS", "HEAVY SHOWER", "HVY RAIN", 
+    "LIGHT FREEZING RAIN", "MIXED PRECIP", "Mixed Precipitation", 
+    "MIXED PRECIPITATION", "RAIN", "RAIN/SNOW", "RAIN/WIND", 
+    "RAINSTORM", "RECORD RAINFALL", "Torrential Rainfall", "UNSEASONAL RAIN"
+    ),
+ `RIP CURRENT` = c("RIP CURRENT", "RIP CURRENTS", "RIP CURRENTS/HEAVY SURF"
+    ),
+ SEAS = c("HEAVY SEAS", "ROGUE WAVE", "ROUGH SEAS"),
+ SMOKE = "DENSE SMOKE", 
+ SNOW = c("BLIZZARD", "BLIZZARD/WINTER STORM", "blowing snow", 
+    "BLOWING SNOW", "EXCESSIVE SNOW", "FALLING SNOW/ICE", "GROUND BLIZZARD", 
+    "HEAVY LAKE SNOW", "HEAVY MIX", "HEAVY SNOW", "HEAVY SNOW AND HIGH WINDS", 
+    "HEAVY SNOW AND STRONG WINDS", "Heavy snow shower", "HEAVY SNOW SQUALLS", 
+    "HEAVY SNOW-SQUALLS", "HEAVY SNOW/BLIZZARD", "HEAVY SNOW/BLIZZARD/AVALANCHE", 
+    "HEAVY SNOW/FREEZING RAIN", "HEAVY SNOW/HIGH WINDS & FLOOD", 
+    "HEAVY SNOW/ICE", "HEAVY SNOW/SQUALLS", "HEAVY SNOW/WIND", 
+    "HEAVY SNOW/WINTER STORM", "HEAVY SNOWPACK", "Lake Effect Snow", 
+    "LAKE EFFECT SNOW", "LAKE-EFFECT SNOW", "LATE SEASON SNOW", 
+    "Light snow", "Light Snow", "LIGHT SNOW", "Light Snowfall", 
+    "RECORD SNOW", "Snow", "SNOW", "SNOW ACCUMULATION", "SNOW AND HEAVY SNOW", 
+    "SNOW AND ICE", "SNOW AND ICE STORM", "SNOW FREEZING RAIN", 
+    "SNOW SQUALL", "Snow Squalls", "SNOW SQUALLS", "SNOW/ BITTER COLD", 
+    "SNOW/ ICE", "SNOW/BLOWING SNOW", "SNOW/COLD", "SNOW/FREEZING RAIN", 
+    "SNOW/HEAVY SNOW", "SNOW/HIGH WINDS", "SNOW/ICE", "SNOW/ICE STORM", 
+    "SNOW/SLEET", "SNOW/SLEET/FREEZING RAIN"),
+ SURF = c("   HIGH SURF ADVISORY", 
+    "HAZARDOUS SURF", "Heavy Surf", "HEAVY SURF", "Heavy surf and wind", 
+    "HEAVY SURF/HIGH SURF", "HEAVY SWELLS", "HIGH SEAS", "High Surf", 
+    "HIGH SURF", "HIGH SWELLS", "HIGH TIDES", "HIGH WATER", "HIGH WAVES", 
+    "ROUGH SURF", "SEICHE"),
+ THUNDERSTORM = c("SEVERE THUNDERSTORM", 
+    "SEVERE THUNDERSTORMS", "THUDERSTORM WINDS", "THUNDEERSTORM WINDS", 
+    "THUNDERESTORM WINDS", "THUNDERSNOW", "THUNDERSTORM", "THUNDERSTORM  WINDS", 
+    "THUNDERSTORM DAMAGE TO", "THUNDERSTORM HAIL", "THUNDERSTORM WIND", 
+    "THUNDERSTORM WIND (G40)", "THUNDERSTORM WIND 60 MPH", "THUNDERSTORM WIND 65 MPH", 
+    "THUNDERSTORM WIND 65MPH", "THUNDERSTORM WIND 98 MPH", "THUNDERSTORM WIND G50", 
+    "THUNDERSTORM WIND G52", "THUNDERSTORM WIND G55", "THUNDERSTORM WIND G60", 
+    "THUNDERSTORM WIND TREES", "THUNDERSTORM WIND.", "THUNDERSTORM WIND/ TREE", 
+    "THUNDERSTORM WIND/ TREES", "THUNDERSTORM WIND/AWNING", "THUNDERSTORM WIND/HAIL", 
+    "THUNDERSTORM WIND/LIGHTNING", "THUNDERSTORM WINDS", "THUNDERSTORM WINDS 13", 
+    "THUNDERSTORM WINDS 63 MPH", "THUNDERSTORM WINDS AND", "THUNDERSTORM WINDS G60", 
+    "THUNDERSTORM WINDS HAIL", "THUNDERSTORM WINDS LIGHTNING", 
+    "THUNDERSTORM WINDS.", "THUNDERSTORM WINDS/ FLOOD", "THUNDERSTORM WINDS/FLOODING", 
+    "THUNDERSTORM WINDS/FUNNEL CLOU", "THUNDERSTORM WINDS/HAIL", 
+    "THUNDERSTORM WINDS53", "THUNDERSTORM WINDSHAIL", "THUNDERSTORM WINDSS", 
+    "THUNDERSTORM WINS", "THUNDERSTORMS", "THUNDERSTORMS WIND", 
+    "THUNDERSTORMS WINDS", "THUNDERSTORMW", "THUNDERSTORMWINDS", 
+    "THUNDERSTROM WIND", "THUNDERTORM WINDS", "THUNERSTORM WINDS"
+    ),
+ TORNADO = c("COLD AIR TORNADO", "LANDSPOUT", "TORNADO", 
+    "TORNADO F0", "TORNADO F1", "TORNADO F2", "TORNADO F3", "TORNADOES", 
+    "TORNADOES, TSTM WIND, HAIL", "TORNDAO", "WATERSPOUT", "WATERSPOUT TORNADO", 
+    "WATERSPOUT-", "WATERSPOUT-TORNADO", "WATERSPOUT/ TORNADO", 
+    "WATERSPOUT/TORNADO"),
+ TSUNAMI = "TSUNAMI", 
+ TYPHOON = "TYPHOON", 
+ VOLCANO = "VOLCANIC ASH", 
+ WIND = c(" TSTM WIND", " TSTM WIND (G45)", 
+    "DOWNBURST", "DRY MICROBURST", "DRY MIRCOBURST WINDS", "gradient wind", 
+    "Gradient wind", "GRADIENT WIND", "GUSTNADO", "GUSTY WIND", 
+    "GUSTY WIND/HAIL", "GUSTY WIND/HVY RAIN", "Gusty wind/rain", 
+    "Gusty winds", "Gusty Winds", "GUSTY WINDS", "HIGH  WINDS", 
+    "HIGH WIND", "HIGH WIND (G40)", "HIGH WIND 48", "HIGH WIND AND SEAS", 
+    "HIGH WIND DAMAGE", "HIGH WIND/BLIZZARD", "HIGH WIND/HEAVY SNOW", 
+    "HIGH WIND/SEAS", "HIGH WINDS", "HIGH WINDS HEAVY RAINS", 
+    "HIGH WINDS/", "HIGH WINDS/COASTAL FLOOD", "HIGH WINDS/COLD", 
+    "HIGH WINDS/HEAVY RAIN", "HIGH WINDS/SNOW", "Microburst", 
+    "MICROBURST", "MICROBURST WINDS", "NON TSTM WIND", "NON-SEVERE WIND DAMAGE", 
+    "NON-TSTM WIND", "SEVERE THUNDERSTORM WINDS", "SEVERE TURBULENCE", 
+    "STORM FORCE WINDS", "Strong Wind", "STRONG WIND", "Strong Winds", 
+    "STRONG WINDS", "Tstm Wind", "TSTM WIND", "TSTM WIND  (G45)", 
+    "TSTM WIND (41)", "TSTM WIND (G35)", "TSTM WIND (G40)", "TSTM WIND (G45)", 
+    "TSTM WIND 40", "TSTM WIND 45", "TSTM WIND 55", "TSTM WIND 65)", 
+    "TSTM WIND AND LIGHTNING", "TSTM WIND DAMAGE", "TSTM WIND G45", 
+    "TSTM WIND G58", "TSTM WIND/HAIL", "TSTM WINDS", "TSTMW", 
+    "TUNDERSTORM WIND", "WET MICROBURST", "Whirlwind", "WHIRLWIND", 
+    "Wind", "WIND", "WIND AND WAVE", "Wind Damage", "WIND DAMAGE", 
+    "WIND STORM", "WIND/HAIL", "WINDS"),
+ `WINTER STORM` = c("WINTER STORM", 
+    "WINTER STORM HIGH WINDS", "WINTER STORMS", "WINTER WEATHER", 
+    "WINTER WEATHER MIX", "WINTER WEATHER/MIX", "Wintry Mix", 
+    "WINTRY MIX")
+)
+
+# show a sample
+storm_evmap[9:11]
+```
+
+To efficiently merge this list with the `storm` data frame, it is converted to a data frame:
+
+```{r}
+storm_evmap <- ldply(storm_evmap, function(EVTYPE) data.frame(EVTYPE))
+head(storm_evmap)
+```
+
+Primary data set `storm` is now joined with `storm_evmap`, and the new category variable renamed to `EV_LEVEL1`:
+
+```{r}
+storm <- join(storm, storm_evmap, by = "EVTYPE")
+storm <- rename(storm, c(".id" = "EV_LEVEL1"))
+sample_n(select(storm, EVTYPE, EV_LEVEL1), 10)
+```
+
+
+<!--
+
+ 
+fi_sums <- ddply(storm, c('EV_LEVEL1'), function(s) c(FATALITIES=sum(s$FATALITIES), INJURIES=sum(s$INJURIES)))
+    
+plot_fatalities <- ggplot(fi_sums, aes(reorder(EV_LEVEL1, -FATALITIES), FATALITIES)) +
+    geom_bar(stat='identity') +
+    theme(text = element_text(size=20),axis.text.x = element_text(angle=90, hjust=1.0)) +
+    scale_x_discrete(limits = fi_sums[order(fi_sums$FATALITIES, decreasing = TRUE), 'EV_LEVEL1'][1:10]) +
+    xlab("") 
+
+plot_injuries <- ggplot(fi_sums, aes(reorder(EV_LEVEL1, -INJURIES), INJURIES)) +
+    geom_bar(stat='identity') +
+    theme(text = element_text(size=20),axis.text.x = element_text(angle=90, hjust=1.0)) +
+    scale_x_discrete(limits = fi_sums[order(fi_sums$INJURIES, decreasing = TRUE), 'EV_LEVEL1'][1:10]) +
+    xlab("")
+
+plot_fi <- grid.arrange(plot_fatalities, plot_injuries, ncol = 2, 
+                        main=textGrob(paste0("Top 10 Fatality and Injury-Causing Storm Events in the United States, ", pdate_range_str)))
+
+### PROPS N CROPS
+
+
+# sample_n(select(storm[storm$PROPDMGEXP=='B',], PROPDMG, PROPDMGEXP, prop_dmg_tot), 20)
+
+dmg_sums <- ddply(storm, c('EV_LEVEL1'), function(s) c(prop_dmg_tot=sum(s$prop_dmg_tot), crop_dmg_tot=sum(s$crop_dmg_tot)))
+
+plot_prop_dmg <- ggplot(dmg_sums, aes(reorder(EV_LEVEL1, -prop_dmg_tot), prop_dmg_tot/1e+09)) +
+    geom_bar(stat='identity') +
+    theme(text = element_text(size=20),axis.text.x = element_text(angle=90, hjust=1.0)) +
+    scale_x_discrete(limits = dmg_sums[order(dmg_sums$prop_dmg_tot, decreasing = TRUE), 'EV_LEVEL1'][1:10]) +
+    xlab("") + ylab("PROPERTY DAMAGE (USD billions)")
+
+plot_crop_dmg <- ggplot(dmg_sums, aes(reorder(EV_LEVEL1, -crop_dmg_tot), crop_dmg_tot/1e+09)) +
+    geom_bar(stat='identity') +
+    theme(text = element_text(size=20),axis.text.x = element_text(angle=90, hjust=1.0)) +
+    scale_x_discrete(limits = dmg_sums[order(dmg_sums$crop_dmg_tot, decreasing = TRUE), 'EV_LEVEL1'][1:10]) +
+    xlab("") + ylab("CROP DAMAGE (USD billions)")
+
+plot_propsncrops <- grid.arrange(plot_prop_dmg, plot_crop_dmg, ncol = 2, 
+                        main=textGrob(paste0("Top 10 Property and Crop-Damaging Storm Events in the United States, ", pdate_range_str)))
+
+
+
+
+
+
+
+
+
+
+-->
+            

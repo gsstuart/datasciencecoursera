@@ -2,7 +2,6 @@ library(plyr)
 library(dplyr)
 library(ggplot2)
 library(gridExtra)
-options(scipen=7)
 
 setwd("~/datasciencecoursera//5.repro//pa2")
 

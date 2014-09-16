@@ -1,9 +1,11 @@
 ```{r}
 set.seed(27182818)
-library(plyr, quietly=TRUE)
-library(dplyr, quietly=TRUE)
-library(ggplot2, quietly=TRUE)
-library(gridExtra, quietly=TRUE)
+suppressPackageStartupMessages({
+library(plyr)
+library(dplyr)
+library(ggplot2)
+library(gridExtra)
+})
 ```
 
 <!-- setwd("~/datasciencecoursera//5.repro//pa2") -->
@@ -39,7 +41,7 @@ storm$prop_dmg_tot <- storm$PROPDMG * ifelse(storm$PROPDMGEXP %in% c('k','K'), 1
 storm$crop_dmg_tot <- storm$CROPDMG * ifelse(storm$CROPDMGEXP %in% c('k','K'), 1e+03,
                                       ifelse(storm$CROPDMGEXP %in% c('m','M'), 1e+06,
                                       ifelse(storm$CROPDMGEXP %in% c('b','B'), 1e+09, 0)))
-sample_n(select(filter(storm, prop_dmg_tot > 0), EVTYPE, PROPDMG, PROPDMGEXP, prop_dmg_tot), 10)
+sample_n(select(filter(storm, prop_dmg_tot > 0, crop_dmg_tot > 0), EVTYPE, PROPDMG, PROPDMGEXP, prop_dmg_tot, CROPDMG, CROPDMGEXP, crop_dmg_tot), 10)
 ```
 
 The `EVTYPE` column in the original data specifies the type of storm, based on the storm designations in the NWS codebook.  This data field is highly unstructured, with many different labels used to described the same phenomenon; this is due to differing naming conventions, abbreviations, and misspellings introduced by the wide variety of researchers contributing to this data set.
@@ -254,56 +256,56 @@ sample_n(select(storm, EVTYPE, EV_LEVEL1), 10)
 ```
 
 
-<!--
+## Results
 
- 
+### Across the United States, which types of events are most harmful with respect to population health?
+
+A bar plot is generated showing the top 10 fatality and injury-causing storm events, using the new `EV_LEVEL1` field.
+
+```{r plot1, fig.width=14, fig.height=7}
 fi_sums <- ddply(storm, c('EV_LEVEL1'), function(s) c(FATALITIES=sum(s$FATALITIES), INJURIES=sum(s$INJURIES)))
     
 plot_fatalities <- ggplot(fi_sums, aes(reorder(EV_LEVEL1, -FATALITIES), FATALITIES)) +
     geom_bar(stat='identity') +
     theme(text = element_text(size=20),axis.text.x = element_text(angle=90, hjust=1.0)) +
-    scale_x_discrete(limits = fi_sums[order(fi_sums$FATALITIES, decreasing = TRUE), 'EV_LEVEL1'][1:10]) +
-    xlab("") 
+    scale_x_discrete(limits = rev(fi_sums[order(fi_sums$FATALITIES, decreasing = TRUE), 'EV_LEVEL1'][1:10])) +
+    xlab("") + coord_flip()
 
 plot_injuries <- ggplot(fi_sums, aes(reorder(EV_LEVEL1, -INJURIES), INJURIES)) +
     geom_bar(stat='identity') +
     theme(text = element_text(size=20),axis.text.x = element_text(angle=90, hjust=1.0)) +
-    scale_x_discrete(limits = fi_sums[order(fi_sums$INJURIES, decreasing = TRUE), 'EV_LEVEL1'][1:10]) +
-    xlab("")
+    scale_x_discrete(limits = rev(fi_sums[order(fi_sums$INJURIES, decreasing = TRUE), 'EV_LEVEL1'][1:10])) +
+    xlab("") + coord_flip()
 
-plot_fi <- grid.arrange(plot_fatalities, plot_injuries, ncol = 2, 
-                        main=textGrob(paste0("Top 10 Fatality and Injury-Causing Storm Events in the United States, ", pdate_range_str)))
+suppressWarnings(grid.arrange(plot_fatalities, plot_injuries, ncol = 2, 
+                main=textGrob(paste0("Top 10 Fatality and Injury-Causing Storm Events in the United States, ", pdate_range_str),gp=gpar(fontsize=24))))
+```
 
-### PROPS N CROPS
+### Across the United States, which types of events have the greatest economic consequences?
 
+A bar plot is generated showing the top 10 most expensive storm event types, with regards to property and crop damage.
 
-# sample_n(select(storm[storm$PROPDMGEXP=='B',], PROPDMG, PROPDMGEXP, prop_dmg_tot), 20)
-
+```{r plot2, fig.width=14, fig.height=7}
 dmg_sums <- ddply(storm, c('EV_LEVEL1'), function(s) c(prop_dmg_tot=sum(s$prop_dmg_tot), crop_dmg_tot=sum(s$crop_dmg_tot)))
 
 plot_prop_dmg <- ggplot(dmg_sums, aes(reorder(EV_LEVEL1, -prop_dmg_tot), prop_dmg_tot/1e+09)) +
     geom_bar(stat='identity') +
     theme(text = element_text(size=20),axis.text.x = element_text(angle=90, hjust=1.0)) +
-    scale_x_discrete(limits = dmg_sums[order(dmg_sums$prop_dmg_tot, decreasing = TRUE), 'EV_LEVEL1'][1:10]) +
-    xlab("") + ylab("PROPERTY DAMAGE (USD billions)")
+    scale_x_discrete(limits = rev(dmg_sums[order(dmg_sums$prop_dmg_tot, decreasing = TRUE), 'EV_LEVEL1'][1:10])) +
+    xlab("") + ylab("PROPERTY DAMAGE (USD billions)") + coord_flip()
 
 plot_crop_dmg <- ggplot(dmg_sums, aes(reorder(EV_LEVEL1, -crop_dmg_tot), crop_dmg_tot/1e+09)) +
     geom_bar(stat='identity') +
     theme(text = element_text(size=20),axis.text.x = element_text(angle=90, hjust=1.0)) +
-    scale_x_discrete(limits = dmg_sums[order(dmg_sums$crop_dmg_tot, decreasing = TRUE), 'EV_LEVEL1'][1:10]) +
-    xlab("") + ylab("CROP DAMAGE (USD billions)")
+    scale_x_discrete(limits = rev(dmg_sums[order(dmg_sums$crop_dmg_tot, decreasing = TRUE), 'EV_LEVEL1'][1:10])) +
+    xlab("") + ylab("CROP DAMAGE (USD billions)") + coord_flip()
 
-plot_propsncrops <- grid.arrange(plot_prop_dmg, plot_crop_dmg, ncol = 2, 
-                        main=textGrob(paste0("Top 10 Property and Crop-Damaging Storm Events in the United States, ", pdate_range_str)))
-
-
-
+suppressWarnings(grid.arrange(plot_prop_dmg, plot_crop_dmg, ncol = 2, 
+                 main=textGrob(paste0("Top 10 Property and Crop-Damaging Storm Events in the United States, ", pdate_range_str),gp=gpar(fontsize=24))))
+```
 
 
 
 
 
 
-
--->
-            

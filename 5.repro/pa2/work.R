@@ -2,6 +2,7 @@ library(plyr)
 library(dplyr)
 library(ggplot2)
 library(gridExtra)
+options(scipen=7)
 
 setwd("~/datasciencecoursera//5.repro//pa2")
 
@@ -21,14 +22,14 @@ storm <- join(storm, storm_evmap, by = "EVTYPE")
 fi_sums <- ddply(storm, c('EV_LEVEL1'), function(s) c(FATALITIES=sum(s$FATALITIES), INJURIES=sum(s$INJURIES)))
     
 plot_fatalities <- ggplot(fi_sums, aes(reorder(EV_LEVEL1, -FATALITIES), FATALITIES)) +
-     geom_bar(stat='identity') +
-     theme(text = element_text(size=20),axis.text.x = element_text(angle=90, vjust=0.7)) +
-     scale_x_discrete(limits = fi_sums[order(fi_sums$FATALITIES, decreasing = TRUE), 'EV_LEVEL1'][1:10]) +
-    xlab("")
+    geom_bar(stat='identity') +
+    theme(text = element_text(size=20),axis.text.x = element_text(angle=90, hjust=1.0)) +
+    scale_x_discrete(limits = fi_sums[order(fi_sums$FATALITIES, decreasing = TRUE), 'EV_LEVEL1'][1:10]) +
+    xlab("") 
 
 plot_injuries <- ggplot(fi_sums, aes(reorder(EV_LEVEL1, -INJURIES), INJURIES)) +
     geom_bar(stat='identity') +
-    theme(text = element_text(size=20),axis.text.x = element_text(angle=90, vjust=0.7)) +
+    theme(text = element_text(size=20),axis.text.x = element_text(angle=90, hjust=1.0)) +
     scale_x_discrete(limits = fi_sums[order(fi_sums$INJURIES, decreasing = TRUE), 'EV_LEVEL1'][1:10]) +
     xlab("")
 
@@ -49,15 +50,20 @@ storm$crop_dmg_tot <- storm$CROPDMG * ifelse(storm$CROPDMGEXP %in% c('k','K'), 1
 
 dmg_sums <- ddply(storm, c('EV_LEVEL1'), function(s) c(prop_dmg_tot=sum(s$prop_dmg_tot), crop_dmg_tot=sum(s$crop_dmg_tot)))
 
-plot_prop_dmg <- ggplot(dmg_sums, aes(reorder(EV_LEVEL1, -prop_dmg_tot), prop_dmg_tot)) +
+plot_prop_dmg <- ggplot(dmg_sums, aes(reorder(EV_LEVEL1, -prop_dmg_tot), prop_dmg_tot/1e+09)) +
     geom_bar(stat='identity') +
-    theme(text = element_text(size=20),axis.text.x = element_text(angle=90, vjust=0.7)) +
-    scale_x_discrete(limits = dmg_sums[order(dmg_sums$prop_dmg_tot, decreasing = TRUE), 'EV_LEVEL1'][1:10])
+    theme(text = element_text(size=20),axis.text.x = element_text(angle=90, hjust=1.0)) +
+    scale_x_discrete(limits = dmg_sums[order(dmg_sums$prop_dmg_tot, decreasing = TRUE), 'EV_LEVEL1'][1:10]) +
+    xlab("") + ylab("PROPERTY DAMAGE (USD billions)")
 
-plot_crop_dmg <- ggplot(dmg_sums, aes(reorder(EV_LEVEL1, -crop_dmg_tot), crop_dmg_tot)) +
+plot_crop_dmg <- ggplot(dmg_sums, aes(reorder(EV_LEVEL1, -crop_dmg_tot), crop_dmg_tot/1e+09)) +
     geom_bar(stat='identity') +
-    theme(text = element_text(size=20),axis.text.x = element_text(angle=90, vjust=0.7)) +
-    scale_x_discrete(limits = dmg_sums[order(dmg_sums$crop_dmg_tot, decreasing = TRUE), 'EV_LEVEL1'][1:10])
+    theme(text = element_text(size=20),axis.text.x = element_text(angle=90, hjust=1.0)) +
+    scale_x_discrete(limits = dmg_sums[order(dmg_sums$crop_dmg_tot, decreasing = TRUE), 'EV_LEVEL1'][1:10]) +
+    xlab("") + ylab("CROP DAMAGE (USD billions)")
+
+plot_propsncrops <- grid.arrange(plot_prop_dmg, plot_crop_dmg, ncol = 2, 
+                        main=textGrob(paste0("Top 10 Property and Crop-Damaging Storm Events in the United States, ", pdate_range_str)))
 
 
 

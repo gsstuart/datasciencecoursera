@@ -1,3 +1,14 @@
+<table border="0" cellspacing="0" cellpadding="0">
+<tr><td><img src="/media/scorpio-win7/Users/scott/datasciencecoursera/5.repro/pa2/header.jpg"</td></tr>
+<tr bgcolor="black"><td align="center"><font color="white" size="14" face="Arial, Helvetica"><b>Storm Data</b><br></font>
+<font color="#CCCCCC" size="4"><i>Course Project 2</i></font>
+<br>
+<br>
+</td></tr>
+</table>
+
+
+
 ```{r}
 set.seed(27182818)
 suppressPackageStartupMessages({
@@ -10,6 +21,14 @@ library(gridExtra)
 
 <!-- setwd("~/datasciencecoursera//5.repro//pa2") -->
 
+<br/>
+## Synopsis
+
+Presented here is an analysis of the NOAA storm database, which tracks characteristics of major storms and weather events in the United States.  This investigation seeks to determine which storm events have had the greatest impact on human health and property, by examining the NOAA storm database figures on fatalities, injuries, property damage costs, and crop damage costs.  Although the database stretches back to 1950, we will restrict this analysis to 1996 and later, based on <a href="http://www.ncdc.noaa.gov/stormevents/details.jsp" target="_blank">NOAA's reporting</a>,  that prior to 1996, event recording was non-standardized and irregular. 
+
+We found that tornadoes and extreme heat have created the highest number fatalities and injuries; floods, hurricanes, and droughts are the worst offenders for crop and property damage.  The plots in this analysis list the top 10 storm events for each of these four consequences, in descending order of severity.
+
+<br/>
 ## Data Processing
 
 The original NOAA/NWS input file is read into data frame `storm`, which will serve as the primary source for the analysis.  To minimize the footprint of this large dataset, columns not used in the analysis are dropped.  Investigators reproducing this analysis should have this script and the `repdata_data_StormData.csv.bz2` input file in the current working directory.
@@ -22,10 +41,12 @@ storm <- read.csv('repdata_data_StormData.csv.bz2', colClasses=colClasses)
 glimpse(storm)
 ```
 
-Column `pdate` is added to provide the event date in a POSIX-compliant format, and the range of dates covered in the input file is calculated for inclusion in plots.
+
+Column `pdate` is added to provide the event date in a POSIX-compliant format, and the range of dates covered in the input file is calculated for inclusion in plots.  At this point `storm` is also filtered to drop rows of data prior to 1996.
 
 ```{r}
 storm$pdate <- as.Date(storm$BGN_DATE, "%m/%d/%Y")
+storm <- filter(storm, as.numeric(format(storm$pdate, "%Y")) >= 1996)
 pdate_range <- format(range(storm$pdate), '%b %Y')
 pdate_range_str <- paste0(pdate_range[[1]], " - ", pdate_range[[2]])
 sample_n(select(storm, EVTYPE, BGN_DATE, pdate), 10)
@@ -255,7 +276,7 @@ storm <- rename(storm, c(".id" = "EV_LEVEL1"))
 sample_n(select(storm, EVTYPE, EV_LEVEL1), 10)
 ```
 
-
+<br/>
 ## Results
 
 ### Across the United States, which types of events are most harmful with respect to population health?
@@ -303,6 +324,7 @@ plot_crop_dmg <- ggplot(dmg_sums, aes(reorder(EV_LEVEL1, -crop_dmg_tot), crop_dm
 suppressWarnings(grid.arrange(plot_prop_dmg, plot_crop_dmg, ncol = 2, 
                  main=textGrob(paste0("Top 10 Property and Crop-Damaging Storm Events in the United States, ", pdate_range_str),gp=gpar(fontsize=24))))
 ```
+
 
 
 

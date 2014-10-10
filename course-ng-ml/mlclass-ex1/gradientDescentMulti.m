@@ -28,23 +28,26 @@ for iter = 1:num_iters
         thetatemp = zeros(n, 1);
         theta0sum = 0;
         theta1sum = 0;
-        for i = 1:m
+%        for i = 1:m
             % thetatemp = zeros(n, 1);
-            h0xi = X(i,:) * theta;
-            yi = y(i);
-            for j = 1:n
-                thetatemp(j,1) = thetatemp(j,1) + ((h0xi - yi) * X(i,j));
-            end
+ %           h0xi = X(i,:) * theta;
+  %          yi = y(i);
+            
+%            for j = 1:n
+%                thetatemp(j,1) = thetatemp(j,1) + ((h0xi - yi) * X(i,j));
+%            end
+
+% thetatemp = thetatemp + ((h0xi - yi) * X(i,:))';
+
+% thetatemp = thetatemp + ((X * theta - y)' * X)';
             % theta0sum = theta0sum + ((h0xi - yi) * X(i,1));
             % theta1sum = theta1sum + ((h0xi - yi) * X(i,2));           
-        end
-% alpha
-% m
-% theta
-% thetatemp
+   %     end
 
-        theta = theta - alpha * (1/m) * thetatemp;
+%        theta = theta - alpha * (1/m) * thetatemp;
 
+theta = theta - alpha * (1/m) * ((X * theta - y)' * X)' ;
+        
         % theta(1) = theta(1) - alpha * (1/m) * thetatemp(1);
         % theta(2) = theta(2) - alpha * (1/m) * thetatemp(2);
         % theta(3) = theta(3) - alpha * (1/m) * thetatemp(3);
